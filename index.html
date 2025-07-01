@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>フォルダの内容をクリップボードにコピー（.meta除外）</title>
+</head>
+<body>
+  <h2>フォルダを選択して、すべてのファイル名と内容をコピー（※.meta ファイルは除外）</h2>
+  <button id="selectFolderBtn">フォルダを選択</button>
+  <pre id="status"></pre>
+
+  <script>
+    document.getElementById('selectFolderBtn').addEventListener('click', async () => {
+      try {
+        const dirHandle = await window.showDirectoryPicker();
+        let output = '';
+        const status = document.getElementById('status');
+        status.textContent = '読み込み中...';
+
+        async function readAllFiles(handle, path = '') {
+          for await (const entry of handle.values()) {
+            const fullPath = path + entry.name;
+
+            if (entry.kind === 'file') {
+              if (entry.name.endsWith('.meta')) {
+                // .meta ファイルはスキップ
+                continue;
+              }
+
+              const file = await entry.getFile();
+              const content = await file.text();
+              output += `【${fullPath}】\n${content}\n\n`;
+            } else if (entry.kind === 'directory') {
+              await readAllFiles(entry, fullPath + '/');
+            }
+          }
+        }
+
+        await readAllFiles(dirHandle);
+
+        await navigator.clipboard.writeText(output);
+        status.textContent = 'クリップボードにコピーしました。\n文字数: ' + output.length;
+      } catch (err) {
+        console.error(err);
+        alert('エラーが発生しました: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
