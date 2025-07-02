@@ -64,7 +64,7 @@
         await navigator.clipboard.writeText(output);
         outputDiv.textContent = output;
 
-        status.textContent = `クリップボードにコピーしました。\n要求文字数: ${output.length}`;
+        status.textContent = `クリップボードにコピーしました。\n文字数: ${output.length}`;
       } catch (err) {
         status.textContent = 'クリップボードへのコピーに失敗しました。\nエラー: ' + err.message;
         console.error(err);
