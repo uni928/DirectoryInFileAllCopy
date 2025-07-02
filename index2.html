@@ -36,12 +36,11 @@
       // Check for null characters
       const nullChars = (text.match(/\x00/g) || []).length;
 
-      // Apply detection thresholds
-      if (totalLength > 100 && (
+      if (
         nonPrintable / totalLength > 0.1 ||
         replacementChars / totalLength > 0.05 ||
         nullChars > 0
-      )) {
+      ) {
         return true;
       }
 
