@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Copy & Display Folder Contents (Exclude Unnecessary Files)</title>
+  <style>
+    body { font-family: sans-serif; padding: 1em; }
+    #outputDisplay {
+      white-space: pre-wrap;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 1em;
+      margin-top: 1em;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>Select a folder to copy and display its contents (Images/Binaries excluded)</h2>
+  <button id="selectFolderBtn">Select Folder</button>
+  <pre id="status"></pre>
+  <div id="outputDisplay"></div>
+
+  <script>
+    // Heuristic check for garbled (possibly binary or unreadable) text
+    function isProbablyGarbled(text) {
+      const totalLength = text.length;
+
+      // Count invisible/control characters
+      const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
+
+      // Detect Unicode replacement character ( )
+      const replacementChars = (text.match(/\uFFFD/g) || []).length;
+
+      // Check for null characters
+      const nullChars = (text.match(/\x00/g) || []).length;
+
+      // Apply detection thresholds
+      if (totalLength > 100 && (
+        nonPrintable / totalLength > 0.1 ||
+        replacementChars / totalLength > 0.05 ||
+        nullChars > 0
+      )) {
+        return true;
+      }
+
+      return false;
+    }
+
+    document.getElementById('selectFolderBtn').addEventListener('click', async () => {
+      const status = document.getElementById('status');
+      const outputDiv = document.getElementById('outputDisplay');
+      outputDiv.textContent = '';
+      status.textContent = 'Loading...';
+
+      try {
+        const dirHandle = await window.showDirectoryPicker();
+        let output = '';
+
+        // Extensions to exclude (lowercase)
+        const excludedExtensions = [
+          '.meta', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
+          '.mp4', '.webm', '.mp3', '.wav', '.zip', '.tar', '.gz', '.exe',
+          '.dll', '.class', '.jar', '.so', '.bin', '.dat', '.ttf', '.woff', '.woff2'
+        ];
+
+        async function readAllFiles(handle, path = '') {
+          for await (const entry of handle.values()) {
+            const fullPath = path + entry.name;
+
+            if (entry.kind === 'file') {
+              const lowerName = entry.name.toLowerCase();
+              if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
+                continue; // Skip excluded files
+              }
+
+              const file = await entry.getFile();
+              const content = await file.text();
+              if (!isProbablyGarbled(content)) {
+                output += `【${fullPath}】\n${content}\n\n`;
+              }
+            } else if (entry.kind === 'directory') {
+              await readAllFiles(entry, fullPath + '/');
+            }
+          }
+        }
+
+        await readAllFiles(dirHandle);
+
+        await navigator.clipboard.writeText(output);
+        outputDiv.textContent = output;
+
+        status.textContent = `Copied to clipboard.\nCharacter count: ${output.length}`;
+      } catch (err) {
+        status.textContent = 'Failed to copy to clipboard.\nError: ' + err.message;
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
