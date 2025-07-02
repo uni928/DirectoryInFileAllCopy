@@ -2,29 +2,52 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>フォルダの内容をクリップボードにコピー（.meta除外）</title>
+  <title>フォルダの内容をコピー＆表示（不要ファイル除外）</title>
+  <style>
+    body { font-family: sans-serif; padding: 1em; }
+    #outputDisplay {
+      white-space: pre-wrap;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 1em;
+      margin-top: 1em;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+  </style>
 </head>
 <body>
-  <h2>フォルダを選択して、すべてのファイル名と内容をコピー（※.meta ファイルは除外）</h2>
+  <h2>フォルダを選択して内容をコピー＆表示（※画像・バイナリ除外）</h2>
   <button id="selectFolderBtn">フォルダを選択</button>
   <pre id="status"></pre>
+  <div id="outputDisplay"></div>
 
   <script>
     document.getElementById('selectFolderBtn').addEventListener('click', async () => {
+      const status = document.getElementById('status');
+      const outputDiv = document.getElementById('outputDisplay');
+      outputDiv.textContent = '';
+      status.textContent = '読み込み中...';
+
       try {
         const dirHandle = await window.showDirectoryPicker();
         let output = '';
-        const status = document.getElementById('status');
-        status.textContent = '読み込み中...';
+
+        // 除外する拡張子一覧（小文字）
+        const excludedExtensions = [
+          '.meta', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
+          '.mp4', '.webm', '.mp3', '.wav', '.zip', '.tar', '.gz', '.exe',
+          '.dll', '.class', '.jar', '.so', '.bin', '.dat', '.ttf', '.woff', '.woff2'
+        ];
 
         async function readAllFiles(handle, path = '') {
           for await (const entry of handle.values()) {
             const fullPath = path + entry.name;
 
             if (entry.kind === 'file') {
-              if (entry.name.endsWith('.meta')) {
-                // .meta ファイルはスキップ
-                continue;
+              const lowerName = entry.name.toLowerCase();
+              if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
+                continue; // 除外対象ならスキップ
               }
 
               const file = await entry.getFile();
@@ -39,10 +62,12 @@
         await readAllFiles(dirHandle);
 
         await navigator.clipboard.writeText(output);
-        status.textContent = 'クリップボードにコピーしました。\n文字数: ' + output.length;
+        outputDiv.textContent = output;
+
+        status.textContent = `クリップボードにコピーしました。\n要求文字数: ${output.length}`;
       } catch (err) {
+        status.textContent = 'クリップボードへのコピーに失敗しました。\nエラー: ' + err.message;
         console.error(err);
-        alert('エラーが発生しました: ' + err.message);
       }
     });
   </script>
