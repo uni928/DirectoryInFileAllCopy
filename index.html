@@ -37,12 +37,12 @@ function isProbablyGarbled(text) {
   // バイナリっぽい（null文字含む）もの
   const nullChars = (text.match(/\x00/g) || []).length;
 
-  // 判定基準（文字数が短いと誤判定多いのである程度長いときだけ）
-  if (totalLength > 100 && (
+  // 判定基準
+  if (
     nonPrintable / totalLength > 0.1 ||
     replacementChars / totalLength > 0.05 ||
     nullChars > 0
-  )) {
+  ) {
     return true;
   }
 
