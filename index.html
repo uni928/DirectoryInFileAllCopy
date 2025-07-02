@@ -23,6 +23,32 @@
   <div id="outputDisplay"></div>
 
   <script>
+
+// 文字化けチェック関数
+function isProbablyGarbled(text) {
+  const totalLength = text.length;
+
+  // 含まれる不可視文字や制御文字数をカウント
+  const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
+
+  // replacement character（文字化けの代表）を検出
+  const replacementChars = (text.match(/\uFFFD/g) || []).length;
+
+  // バイナリっぽい（null文字含む）もの
+  const nullChars = (text.match(/\x00/g) || []).length;
+
+  // 判定基準（文字数が短いと誤判定多いのである程度長いときだけ）
+  if (totalLength > 100 && (
+    nonPrintable / totalLength > 0.1 ||
+    replacementChars / totalLength > 0.05 ||
+    nullChars > 0
+  )) {
+    return true;
+  }
+
+  return false;
+}
+
     document.getElementById('selectFolderBtn').addEventListener('click', async () => {
       const status = document.getElementById('status');
       const outputDiv = document.getElementById('outputDisplay');
@@ -52,7 +78,9 @@
 
               const file = await entry.getFile();
               const content = await file.text();
-              output += `【${fullPath}】\n${content}\n\n`;
+              if(!isProbablyGarbled(content)) {
+                output += `【${fullPath}】\n${content}\n\n`;
+              }
             } else if (entry.kind === 'directory') {
               await readAllFiles(entry, fullPath + '/');
             }
@@ -64,7 +92,7 @@
         await navigator.clipboard.writeText(output);
         outputDiv.textContent = output;
 
-        status.textContent = `下記の内容をコピーして下さい。\n文字数: ${output.length}`;
+        status.textContent = `クリップボードにコピーしました。\n文字数: ${output.length}`;
       } catch (err) {
         status.textContent = 'クリップボードへのコピーに失敗しました。\nエラー: ' + err.message;
         console.error(err);
