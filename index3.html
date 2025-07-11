@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ターゲットファイル名含む全ファイルをクリップボードにコピー</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1em;
+    }
+    #dropZone {
+      border: 2px dashed #888;
+      padding: 2em;
+      text-align: center;
+      color: #666;
+      margin-bottom: 1em;
+    }
+    #dropZone.dragover {
+      border-color: #00aaff;
+      color: #00aaff;
+    }
+    #outputDisplay {
+      white-space: pre-wrap;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 1em;
+      margin-top: 1em;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>1ファイルをドラッグ＆ドロップ → 関連ファイル名＆内容をコピー</h2>
+  <div id="dropZone">ここに1つのファイルをドロップ</div>
+  <pre id="status"></pre>
+  <div id="outputDisplay"></div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const status = document.getElementById('status');
+    const outputDiv = document.getElementById('outputDisplay');
+
+    // 文字化け検出
+    function isProbablyGarbled(text) {
+      const totalLength = text.length;
+      const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
+      const replacementChars = (text.match(/\uFFFD/g) || []).length;
+      const nullChars = (text.match(/\x00/g) || []).length;
+      return (
+        nonPrintable / totalLength > 0.1 ||
+        replacementChars / totalLength > 0.05 ||
+        nullChars > 0
+      );
+    }
+
+    // バイナリ＆不要拡張子
+    const excludedExtensions = [
+      '.meta', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
+      '.mp4', '.webm', '.mp3', '.wav', '.zip', '.tar', '.gz', '.exe',
+      '.dll', '.class', '.jar', '.so', '.bin', '.dat', '.ttf', '.woff', '.woff2'
+    ];
+
+    // ドロップイベント
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+
+      if (e.dataTransfer.files.length !== 1) {
+        status.textContent = '⚠️ 1つのファイルのみをドロップしてください';
+        return;
+      }
+
+      const droppedFile = e.dataTransfer.files[0];
+      const baseFileName = droppedFile.name.replace(/\.[^/.]+$/, ''); // 拡張子除去
+
+      status.textContent = `ターゲット: "${baseFileName}"\nフォルダ選択中...`;
+      outputDiv.textContent = '';
+
+      try {
+        const dirHandle = await window.showDirectoryPicker();
+        let output = '';
+
+        async function searchAndCollect(handle, path = '') {
+          for await (const entry of handle.values()) {
+            const fullPath = path + entry.name;
+
+            if (entry.kind === 'file') {
+              const lowerName = entry.name.toLowerCase();
+              if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
+                continue; // 除外
+              }
+
+              const file = await entry.getFile();
+              const content = await file.text();
+
+              if (
+                !isProbablyGarbled(content) &&
+                content.includes(baseFileName)
+              ) {
+                output += `【${fullPath}】\n${content}\n\n`;
+              }
+            } else if (entry.kind === 'directory') {
+              await searchAndCollect(entry, fullPath + '/');
+            }
+          }
+        }
+
+        await searchAndCollect(dirHandle);
+
+        if (output) {
+          await navigator.clipboard.writeText(output);
+          outputDiv.textContent = output;
+          status.textContent = `✅ 関連ファイルをクリップボードにコピーしました\n文字数: ${output.length}`;
+        } else {
+          status.textContent = '⚠️ 該当ファイルが見つかりませんでした';
+        }
+      } catch (err) {
+        status.textContent = '❌ エラー: ' + err.message;
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
