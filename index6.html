@@ -83,6 +83,7 @@
       const droppedFile = e.dataTransfer.files[0];
       const baseFileName = droppedFile.name.replace(/\.[^/.]+$/, ''); // Remove extension
       const droppedFileName = droppedFile.name; // Full filename
+      const droppedFileContent = await droppedFile.text(); // Get content of dropped file
 
       status.textContent = `Target: "${baseFileName}"\nSelecting folder...`;
       outputDiv.textContent = '';
@@ -104,9 +105,6 @@
 
               const file = await entry.getFile();
               const content = await file.text();
-
-              // Get content of dropped file
-              const droppedFileContent = await droppedFile.text();
 
               // Prepend dropped file content if matching
               if (content === droppedFileContent && entry.name === droppedFile.name) {
