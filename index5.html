@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Copy All Files Containing Target Filename to Clipboard</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1em;
+    }
+    #dropZone {
+      border: 2px dashed #888;
+      padding: 2em;
+      text-align: center;
+      color: #666;
+      margin-bottom: 1em;
+    }
+    #dropZone.dragover {
+      border-color: #00aaff;
+      color: #00aaff;
+    }
+    #outputDisplay {
+      white-space: pre-wrap;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 1em;
+      margin-top: 1em;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>Drag & Drop a File → Copy Related Filenames & Contents</h2>
+  <div id="dropZone">Drop a single file here</div>
+  <pre id="status"></pre>
+  <div id="outputDisplay"></div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const status = document.getElementById('status');
+    const outputDiv = document.getElementById('outputDisplay');
+
+    // Detect potential garbled text
+    function isProbablyGarbled(text) {
+      const totalLength = text.length;
+      const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
+      const replacementChars = (text.match(/\uFFFD/g) || []).length;
+      const nullChars = (text.match(/\x00/g) || []).length;
+      return (
+        nonPrintable / totalLength > 0.1 ||
+        replacementChars / totalLength > 0.05 ||
+        nullChars > 0
+      );
+    }
+
+    // Binary and excluded file extensions
+    const excludedExtensions = [
+      '.meta', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
+      '.mp4', '.webm', '.mp3', '.wav', '.zip', '.tar', '.gz', '.exe',
+      '.dll', '.class', '.jar', '.so', '.bin', '.dat', '.ttf', '.woff', '.woff2'
+    ];
+
+    // Handle drag events
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+
+      if (e.dataTransfer.files.length !== 1) {
+        status.textContent = '⚠️ Please drop only one file';
+        return;
+      }
+
+      const droppedFile = e.dataTransfer.files[0];
+      const baseFileName = droppedFile.name.replace(/\.[^/.]+$/, ''); // Remove extension
+
+      status.textContent = `Target: "${baseFileName}"\nSelecting folder...`;
+      outputDiv.textContent = '';
+
+      try {
+        const dirHandle = await window.showDirectoryPicker();
+        let output = '';
+
+        async function searchAndCollect(handle, path = '') {
+          for await (const entry of handle.values()) {
+            const fullPath = path + entry.name;
+
+            if (entry.kind === 'file') {
+              const lowerName = entry.name.toLowerCase();
+              if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
+                continue; // Skip excluded files
+              }
+
+              const file = await entry.getFile();
+              const content = await file.text();
+
+              if (
+                !isProbablyGarbled(content) &&
+                content.includes(baseFileName)
+              ) {
+                output += `【${fullPath}】\n${content}\n\n`;
+              }
+            } else if (entry.kind === 'directory') {
+              await searchAndCollect(entry, fullPath + '/');
+            }
+          }
+        }
+
+        await searchAndCollect(dirHandle);
+
+        if (output) {
+          await navigator.clipboard.writeText(output);
+          outputDiv.textContent = output;
+          status.textContent = `✅ Related files copied to clipboard\nCharacter count: ${output.length}`;
+        } else {
+          status.textContent = '⚠️ No matching files found';
+        }
+      } catch (err) {
+        status.textContent = '❌ Error: ' + err.message;
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
