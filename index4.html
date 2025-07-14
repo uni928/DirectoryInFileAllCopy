@@ -83,6 +83,7 @@
       const droppedFile = e.dataTransfer.files[0];
       const baseFileName = droppedFile.name.replace(/\.[^/.]+$/, ''); // 拡張子除去
       const droppedFileName = droppedFile.name; // フルファイル名
+      const droppedFileContent = await droppedFile.text();// ドロップしたファイルの内容を取得
 
       status.textContent = `ターゲット: "${baseFileName}"\nフォルダ選択中...`;
       outputDiv.textContent = '';
@@ -104,9 +105,6 @@
 
               const file = await entry.getFile();
               const content = await file.text();
-
-              // ドロップしたファイルの内容を取得
-              const droppedFileContent = await droppedFile.text();
 
               // ドロップしたファイルなら先頭に追加
               if (content === droppedFileContent && entry.name === droppedFile.name) {
