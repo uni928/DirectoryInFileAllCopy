@@ -114,7 +114,7 @@
                 !isProbablyGarbled(content) &&
                 content.includes(baseFileName)
               ) {
-                output += `【${fullPath}】\n${content}\n\n`;
+                output += `【関連ファイル(${fullPath})】\n${content}\n\n`;
               }
               }
             } else if (entry.kind === 'directory') {
