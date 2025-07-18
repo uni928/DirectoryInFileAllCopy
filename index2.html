@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Copy & Display Folder Contents (Exclude Unnecessary Files)</title>
+  <title>Copy & Display Folder Contents (Exclude Unwanted Files)</title>
   <style>
     body { font-family: sans-serif; padding: 1em; }
     #outputDisplay {
@@ -14,88 +14,93 @@
       max-height: 400px;
       overflow-y: auto;
     }
+    label { display: block; margin-top: 1em; }
+    input[type="text"] { width: 100%; padding: 0.5em; margin-top: 0.5em; }
   </style>
 </head>
 <body>
-  <h2>Select a folder to copy and display its contents (Images/Binaries/GarbledFiles excluded)</h2>
+  <h2>Select a Folder to Copy & Display Contents (Exclude Images, Binary, and Garbled Files)</h2>
+
+  <label for="excludeInput">Exclude Extensions (comma-separated, e.g. .log,.bak,.tmp)</label>
+  <input type="text" id="excludeInput" placeholder=".log,.bak,.tmp">
+
   <button id="selectFolderBtn">Select Folder</button>
   <pre id="status"></pre>
   <div id="outputDisplay"></div>
 
   <script>
-    // Heuristic check for garbled (possibly binary or unreadable) text
-    function isProbablyGarbled(text) {
-      const totalLength = text.length;
+  // Function to check if text is probably garbled
+  function isProbablyGarbled(text) {
+    const totalLength = text.length;
+    const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
+    const replacementChars = (text.match(/\uFFFD/g) || []).length;
+    const nullChars = (text.match(/\x00/g) || []).length;
 
-      // Count invisible/control characters
-      const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
+    return (
+      nonPrintable / totalLength > 0.1 ||
+      replacementChars / totalLength > 0.05 ||
+      nullChars > 0
+    );
+  }
 
-      // Detect Unicode replacement character ( )
-      const replacementChars = (text.match(/\uFFFD/g) || []).length;
+  document.getElementById('selectFolderBtn').addEventListener('click', async () => {
+    const status = document.getElementById('status');
+    const outputDiv = document.getElementById('outputDisplay');
+    const excludeInput = document.getElementById('excludeInput').value;
 
-      // Check for null characters
-      const nullChars = (text.match(/\x00/g) || []).length;
+    outputDiv.textContent = '';
+    status.textContent = 'Loading...';
 
-      if (
-        nonPrintable / totalLength > 0.1 ||
-        replacementChars / totalLength > 0.05 ||
-        nullChars > 0
-      ) {
-        return true;
-      }
+    try {
+      const dirHandle = await window.showDirectoryPicker();
+      let output = '';
 
-      return false;
-    }
+      // Default excluded extensions
+      const defaultExcludedExtensions = [
+        '.meta', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
+        '.mp4', '.webm', '.mp3', '.wav', '.zip', '.tar', '.gz', '.exe',
+        '.dll', '.class', '.jar', '.so', '.bin', '.dat', '.ttf', '.woff', '.woff2'
+      ];
 
-    document.getElementById('selectFolderBtn').addEventListener('click', async () => {
-      const status = document.getElementById('status');
-      const outputDiv = document.getElementById('outputDisplay');
-      outputDiv.textContent = '';
-      status.textContent = 'Loading...';
+      // Add user-defined excluded extensions
+      const userExcludedExtensions = excludeInput.split(',')
+        .map(ext => ext.trim().toLowerCase())
+        .filter(ext => ext.startsWith('.')); // Exclude empty or invalid entries
 
-      try {
-        const dirHandle = await window.showDirectoryPicker();
-        let output = '';
+      const excludedExtensions = defaultExcludedExtensions.concat(userExcludedExtensions);
 
-        // Extensions to exclude (lowercase)
-        const excludedExtensions = [
-          '.meta', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
-          '.mp4', '.webm', '.mp3', '.wav', '.zip', '.tar', '.gz', '.exe',
-          '.dll', '.class', '.jar', '.so', '.bin', '.dat', '.ttf', '.woff', '.woff2'
-        ];
+      async function readAllFiles(handle, path = '') {
+        for await (const entry of handle.values()) {
+          const fullPath = path + entry.name;
 
-        async function readAllFiles(handle, path = '') {
-          for await (const entry of handle.values()) {
-            const fullPath = path + entry.name;
-
-            if (entry.kind === 'file') {
-              const lowerName = entry.name.toLowerCase();
-              if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
-                continue; // Skip excluded files
-              }
-
-              const file = await entry.getFile();
-              const content = await file.text();
-              if (!isProbablyGarbled(content)) {
-                output += `【${fullPath}】\n${content}\n\n`;
-              }
-            } else if (entry.kind === 'directory') {
-              await readAllFiles(entry, fullPath + '/');
+          if (entry.kind === 'file') {
+            const lowerName = entry.name.toLowerCase();
+            if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
+              continue; // Skip excluded files
             }
+
+            const file = await entry.getFile();
+            const content = await file.text();
+            if (!isProbablyGarbled(content)) {
+              output += `【${fullPath}】\n${content}\n\n`;
+            }
+          } else if (entry.kind === 'directory') {
+            await readAllFiles(entry, fullPath + '/');
           }
         }
-
-        await readAllFiles(dirHandle);
-
-        await navigator.clipboard.writeText(output);
-        outputDiv.textContent = output;
-
-        status.textContent = `Copied to clipboard.\nCharacter count: ${output.length}`;
-      } catch (err) {
-        status.textContent = 'Failed to copy to clipboard.\nError: ' + err.message;
-        console.error(err);
       }
-    });
+
+      await readAllFiles(dirHandle);
+
+      await navigator.clipboard.writeText(output);
+      outputDiv.textContent = output;
+
+      status.textContent = `Copied to clipboard.\nCharacter count: ${output.length}`;
+    } catch (err) {
+      status.textContent = 'Failed to copy to clipboard.\nError: ' + err.message;
+      console.error(err);
+    }
+  });
   </script>
 </body>
 </html>
