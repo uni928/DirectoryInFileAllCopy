@@ -24,12 +24,14 @@
   <label for="excludeInput">除外拡張子（カンマ区切り、例: .log,.bak,.tmp）</label>
   <input type="text" id="excludeInput" placeholder=".log,.bak,.tmp">
 
+  <label for="includeInput">指定拡張子（カンマ区切り、例: .txt,.md）</label>
+  <input type="text" id="includeInput" placeholder=".txt,.md">
+
   <button id="selectFolderBtn">フォルダを選択</button>
   <pre id="status"></pre>
   <div id="outputDisplay"></div>
 
   <script>
-  // 文字化けチェック関数
   function isProbablyGarbled(text) {
     const totalLength = text.length;
     const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
@@ -47,6 +49,7 @@
     const status = document.getElementById('status');
     const outputDiv = document.getElementById('outputDisplay');
     const excludeInput = document.getElementById('excludeInput').value;
+    const includeInput = document.getElementById('includeInput').value;
 
     outputDiv.textContent = '';
     status.textContent = '読み込み中...';
@@ -55,19 +58,21 @@
       const dirHandle = await window.showDirectoryPicker();
       let output = '';
 
-      // デフォルトの除外拡張子
       const defaultExcludedExtensions = [
         '.meta', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
         '.mp4', '.webm', '.mp3', '.wav', '.zip', '.tar', '.gz', '.exe',
         '.dll', '.class', '.jar', '.so', '.bin', '.dat', '.ttf', '.woff', '.woff2'
       ];
 
-      // ユーザー入力の除外拡張子を追加
       const userExcludedExtensions = excludeInput.split(',')
         .map(ext => ext.trim().toLowerCase())
-        .filter(ext => ext.startsWith('.')); // 空や無効なものを除外
+        .filter(ext => ext.startsWith('.'));
 
       const excludedExtensions = defaultExcludedExtensions.concat(userExcludedExtensions);
+
+      const userIncludedExtensions = includeInput.split(',')
+        .map(ext => ext.trim().toLowerCase())
+        .filter(ext => ext.startsWith('.'));
 
       async function readAllFiles(handle, path = '') {
         for await (const entry of handle.values()) {
@@ -75,8 +80,16 @@
 
           if (entry.kind === 'file') {
             const lowerName = entry.name.toLowerCase();
+
+            // 除外拡張子チェック
             if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
-              continue; // 除外対象ならスキップ
+              continue;
+            }
+
+            // 指定拡張子が入力されていればその拡張子のみ
+            if (userIncludedExtensions.length > 0 &&
+                !userIncludedExtensions.some(ext => lowerName.endsWith(ext))) {
+              continue;
             }
 
             const file = await entry.getFile();
