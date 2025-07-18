@@ -19,17 +19,19 @@
   </style>
 </head>
 <body>
-  <h2>Select a Folder to Copy & Display Contents (Exclude Images, Binary, and Garbled Files)</h2>
+  <h2>Select a Folder to Copy & Display Contents (Excludes Images, Binaries, and Garbled Files)</h2>
 
-  <label for="excludeInput">Exclude Extensions (comma-separated, e.g. .log,.bak,.tmp)</label>
+  <label for="excludeInput">Excluded Extensions (comma-separated, e.g., .log,.bak,.tmp)</label>
   <input type="text" id="excludeInput" placeholder=".log,.bak,.tmp">
+
+  <label for="includeInput">Included Extensions (comma-separated, e.g., .txt,.md)</label>
+  <input type="text" id="includeInput" placeholder=".txt,.md">
 
   <button id="selectFolderBtn">Select Folder</button>
   <pre id="status"></pre>
   <div id="outputDisplay"></div>
 
   <script>
-  // Function to check if text is probably garbled
   function isProbablyGarbled(text) {
     const totalLength = text.length;
     const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
@@ -47,6 +49,7 @@
     const status = document.getElementById('status');
     const outputDiv = document.getElementById('outputDisplay');
     const excludeInput = document.getElementById('excludeInput').value;
+    const includeInput = document.getElementById('includeInput').value;
 
     outputDiv.textContent = '';
     status.textContent = 'Loading...';
@@ -55,19 +58,21 @@
       const dirHandle = await window.showDirectoryPicker();
       let output = '';
 
-      // Default excluded extensions
       const defaultExcludedExtensions = [
         '.meta', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
         '.mp4', '.webm', '.mp3', '.wav', '.zip', '.tar', '.gz', '.exe',
         '.dll', '.class', '.jar', '.so', '.bin', '.dat', '.ttf', '.woff', '.woff2'
       ];
 
-      // Add user-defined excluded extensions
       const userExcludedExtensions = excludeInput.split(',')
         .map(ext => ext.trim().toLowerCase())
-        .filter(ext => ext.startsWith('.')); // Exclude empty or invalid entries
+        .filter(ext => ext.startsWith('.'));
 
       const excludedExtensions = defaultExcludedExtensions.concat(userExcludedExtensions);
+
+      const userIncludedExtensions = includeInput.split(',')
+        .map(ext => ext.trim().toLowerCase())
+        .filter(ext => ext.startsWith('.'));
 
       async function readAllFiles(handle, path = '') {
         for await (const entry of handle.values()) {
@@ -75,8 +80,16 @@
 
           if (entry.kind === 'file') {
             const lowerName = entry.name.toLowerCase();
+
+            // Skip if file matches any excluded extension
             if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
-              continue; // Skip excluded files
+              continue;
+            }
+
+            // If included extensions are specified, only include those
+            if (userIncludedExtensions.length > 0 &&
+                !userIncludedExtensions.some(ext => lowerName.endsWith(ext))) {
+              continue;
             }
 
             const file = await entry.getFile();
