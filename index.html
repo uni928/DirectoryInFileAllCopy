@@ -21,10 +21,10 @@
 <body>
   <h2>フォルダを選択して内容をコピー＆表示（※画像・バイナリ・文字化けファイル除外）</h2>
 
-  <label for="excludeInput">除外拡張子（カンマ区切り、例: .log,.bak,.tmp）</label>
+  <label for="excludeInput">除外拡張子（カンマ区切り、例: .log,.bak,.tmp）（未入力の場合除外対象無し）</label>
   <input type="text" id="excludeInput" placeholder=".log,.bak,.tmp">
 
-  <label for="includeInput">指定拡張子（カンマ区切り、例: .txt,.md）</label>
+  <label for="includeInput">指定拡張子（カンマ区切り、例: .txt,.md）（未入力の場合全てを対象）</label>
   <input type="text" id="includeInput" placeholder=".txt,.md">
 
   <button id="selectFolderBtn">フォルダを選択</button>
