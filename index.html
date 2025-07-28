@@ -27,7 +27,8 @@
   <label for="includeInput">指定拡張子（カンマ区切り、例: .txt,.md）（未入力の場合、除外以外の全てを対象）</label>
   <input type="text" id="includeInput" placeholder=".txt,.md">
 
-  <label><input type="checkbox" id="addPrefixCheckbox"> 「下記の内容を最新の内容として記憶して下さい」と出力の先頭に付ける（ChatGPT 用）</label><br>
+  <label><input type="checkbox" id="addPrefixCheckbox">「下記の内容を最新の内容として記憶して下さい」と出力の先頭に付ける（ChatGPT 用）</label>
+  <label><input type="checkbox" id="addCheckListCheckbox">「下記のコード一覧で、改善できそうな点をリスト化して下さい」と出力の先頭に付ける（ChatGPT 用）</label><br>
 
   <button id="selectFolderBtn">フォルダを選択</button>
   <pre id="status"></pre>
@@ -47,12 +48,27 @@
     );
   }
 
+  // 排他チェックボックス処理
+  const addPrefixCheckbox = document.getElementById('addPrefixCheckbox');
+  const addCheckListCheckbox = document.getElementById('addCheckListCheckbox');
+
+  addPrefixCheckbox.addEventListener('change', () => {
+    if (addPrefixCheckbox.checked) {
+      addCheckListCheckbox.checked = false;
+    }
+  });
+
+  addCheckListCheckbox.addEventListener('change', () => {
+    if (addCheckListCheckbox.checked) {
+      addPrefixCheckbox.checked = false;
+    }
+  });
+
   document.getElementById('selectFolderBtn').addEventListener('click', async () => {
     const status = document.getElementById('status');
     const outputDiv = document.getElementById('outputDisplay');
     const excludeInput = document.getElementById('excludeInput').value;
     const includeInput = document.getElementById('includeInput').value;
-    const addPrefix = document.getElementById('addPrefixCheckbox').checked;
 
     outputDiv.textContent = '';
     status.textContent = '読み込み中...';
@@ -84,12 +100,10 @@
           if (entry.kind === 'file') {
             const lowerName = entry.name.toLowerCase();
 
-            // 除外拡張子チェック
             if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
               continue;
             }
 
-            // 指定拡張子が入力されていればその拡張子のみ
             if (userIncludedExtensions.length > 0 &&
                 !userIncludedExtensions.some(ext => lowerName.endsWith(ext))) {
               continue;
@@ -108,8 +122,10 @@
 
       await readAllFiles(dirHandle);
 
-      if (addPrefix) {
+      if (addPrefixCheckbox.checked) {
         output = "下記の内容を最新の内容として記憶して下さい。\n\n" + output;
+      } else if (addCheckListCheckbox.checked) {
+        output = "下記のコード一覧で、改善できそうな点をリスト化して下さい。\n\n" + output;
       }
 
       await navigator.clipboard.writeText(output);
