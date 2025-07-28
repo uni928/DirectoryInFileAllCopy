@@ -31,6 +31,12 @@
   </style>
 </head>
 <body>
+  <!-- ✅ チェックボックスを追加 -->
+  <label>
+    <input type="checkbox" id="prependNote">
+    「下記の内容を最新の内容として記憶して下さい」という一文を先頭に添える
+  </label>
+
   <h2>1ファイルをドラッグ＆ドロップ → 関連ファイル名＆内容をコピー</h2>
   <div id="dropZone">ここに1つのファイルをドロップ</div>
   <pre id="status"></pre>
@@ -40,8 +46,8 @@
     const dropZone = document.getElementById('dropZone');
     const status = document.getElementById('status');
     const outputDiv = document.getElementById('outputDisplay');
+    const prependNoteCheckbox = document.getElementById('prependNote'); // ✅ 追加
 
-    // 文字化け検出
     function isProbablyGarbled(text) {
       const totalLength = text.length;
       const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
@@ -54,14 +60,12 @@
       );
     }
 
-    // バイナリ＆不要拡張子
     const excludedExtensions = [
       '.meta', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
       '.mp4', '.webm', '.mp3', '.wav', '.zip', '.tar', '.gz', '.exe',
       '.dll', '.class', '.jar', '.so', '.bin', '.dat', '.ttf', '.woff', '.woff2'
     ];
 
-    // ドロップイベント
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropZone.classList.add('dragover');
@@ -81,9 +85,9 @@
       }
 
       const droppedFile = e.dataTransfer.files[0];
-      const baseFileName = droppedFile.name.replace(/\.[^/.]+$/, ''); // 拡張子除去
-      const droppedFileName = droppedFile.name; // フルファイル名
-      const droppedFileContent = await droppedFile.text();// ドロップしたファイルの内容を取得
+      const baseFileName = droppedFile.name.replace(/\.[^/.]+$/, '');
+      const droppedFileName = droppedFile.name;
+      const droppedFileContent = await droppedFile.text();
 
       status.textContent = `ターゲット: "${baseFileName}"\nフォルダ選択中...`;
       outputDiv.textContent = '';
@@ -100,22 +104,21 @@
             if (entry.kind === 'file') {
               const lowerName = entry.name.toLowerCase();
               if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
-                continue; // 除外
+                continue;
               }
 
               const file = await entry.getFile();
               const content = await file.text();
 
-              // ドロップしたファイルなら先頭に追加
               if (content === droppedFileContent && entry.name === droppedFile.name) {
                 output = `【調査対象ファイル(${fullPath})】\n${content}\n\n` + output;
               } else {
-              if (
-                !isProbablyGarbled(content) &&
-                content.includes(baseFileName)
-              ) {
-                output += `【関連ファイル(${fullPath})】\n${content}\n\n`;
-              }
+                if (
+                  !isProbablyGarbled(content) &&
+                  content.includes(baseFileName)
+                ) {
+                  output += `【関連ファイル(${fullPath})】\n${content}\n\n`;
+                }
               }
             } else if (entry.kind === 'directory') {
               await searchAndCollect(entry, fullPath + '/');
@@ -124,6 +127,11 @@
         }
 
         await searchAndCollect(dirHandle);
+
+        // ✅ チェックボックスがオンなら一文を先頭に追加
+        if (prependNoteCheckbox.checked) {
+          output = '下記の内容を最新の内容として記憶して下さい。\n\n' + output;
+        }
 
         if (output) {
           await navigator.clipboard.writeText(output);
