@@ -27,6 +27,8 @@
   <label for="includeInput">指定拡張子（カンマ区切り、例: .txt,.md）（未入力の場合、除外以外の全てを対象）</label>
   <input type="text" id="includeInput" placeholder=".txt,.md">
 
+  <label><input type="checkbox" id="addPrefixCheckbox"> 「下記の内容を最新の内容として記憶して下さい」と出力の先頭に付ける</label><br>
+
   <button id="selectFolderBtn">フォルダを選択</button>
   <pre id="status"></pre>
   <div id="outputDisplay"></div>
@@ -50,6 +52,7 @@
     const outputDiv = document.getElementById('outputDisplay');
     const excludeInput = document.getElementById('excludeInput').value;
     const includeInput = document.getElementById('includeInput').value;
+    const addPrefix = document.getElementById('addPrefixCheckbox').checked;
 
     outputDiv.textContent = '';
     status.textContent = '読み込み中...';
@@ -104,6 +107,10 @@
       }
 
       await readAllFiles(dirHandle);
+
+      if (addPrefix) {
+        output = "下記の内容を最新の内容として記憶して下さい。\n\n" + output;
+      }
 
       await navigator.clipboard.writeText(output);
       outputDiv.textContent = output;
