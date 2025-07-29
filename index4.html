@@ -35,6 +35,10 @@
   <label>
     <input type="checkbox" id="prependNote">
     「下記の内容を最新の内容として記憶して下さい」という一文を先頭に添える（ChatGPT 用）
+  </label><br>
+  <label>
+    <input type="checkbox" id="enableReverseMatch">
+    ターゲットファイル側に自身のファイル名が含まれているファイルも対象にする
   </label>
 
   <h2>1ファイルをドラッグ＆ドロップ → 関連ファイル名＆内容をコピー</h2>
@@ -97,34 +101,39 @@
       try {
         const dirHandle = await window.showDirectoryPicker();
 
-        async function searchAndCollect(handle, path = '') {
-          for await (const entry of handle.values()) {
-            const fullPath = path + entry.name;
+async function searchAndCollect(handle, path = '') {
+  const enableReverseMatchCheckbox = document.getElementById('enableReverseMatch'); // ✅ 追加
+  for await (const entry of handle.values()) {
+    const fullPath = path + entry.name;
 
-            if (entry.kind === 'file') {
-              const lowerName = entry.name.toLowerCase();
-              if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
-                continue;
-              }
+    if (entry.kind === 'file') {
+      const lowerName = entry.name.toLowerCase();
+      if (excludedExtensions.some(ext => lowerName.endsWith(ext))) {
+        continue;
+      }
 
-              const file = await entry.getFile();
-              const content = await file.text();
+      const file = await entry.getFile();
+      const content = await file.text();
+      const fileBaseName = entry.name.replace(/\.[^/.]+$/, '');
 
-              if (content === droppedFileContent && entry.name === droppedFile.name) {
-                output = `【調査対象ファイル(${fullPath})】\n${content}\n\n` + output;
-              } else {
-                if (
-                  !isProbablyGarbled(content) &&
-                  content.includes(baseFileName)
-                ) {
-                  output += `【関連ファイル(${fullPath})】\n${content}\n\n`;
-                }
-              }
-            } else if (entry.kind === 'directory') {
-              await searchAndCollect(entry, fullPath + '/');
-            }
-          }
+      if (content === droppedFileContent && entry.name === droppedFile.name) {
+        output = `【調査対象ファイル(${fullPath})】\n${content}\n\n` + output;
+      } else {
+        if (
+          !isProbablyGarbled(content) &&
+          (
+            content.includes(baseFileName) || // 従来: 対象ファイル名を含むか
+            (enableReverseMatchCheckbox.checked && droppedFileContent.includes(fileBaseName))
+          )
+        ) {
+          output += `【関連ファイル(${fullPath})】\n${content}\n\n`;
         }
+      }
+    } else if (entry.kind === 'directory') {
+      await searchAndCollect(entry, fullPath + '/');
+    }
+  }
+}
 
         await searchAndCollect(dirHandle);
 
