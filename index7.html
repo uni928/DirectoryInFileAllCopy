@@ -14,6 +14,21 @@
     }
     #fileList {
       margin-top: 10px;
+      list-style: none;
+      padding-left: 0;
+    }
+    #fileList li {
+      margin-bottom: 6px;
+    }
+    .remove-btn {
+      margin-left: 10px;
+      background: #e33;
+      color: white;
+      border: none;
+      padding: 3px 7px;
+      cursor: pointer;
+      font-weight: bold;
+      border-radius: 4px;
     }
     #preview {
       white-space: pre-wrap;
@@ -53,7 +68,7 @@
 <div id="description">
   <h3>使い方</h3>
   <ol>
-    <li>上の枠にテキストファイル（.txt, .json, .csv, .md など）をドラッグ＆ドロップしてください。</li>
+    <li>上の枠にテキストファイル（.txt, .json, .md など）をドラッグ＆ドロップしてください。</li>
     <li>ドロップされたファイルは一覧に追加されます（何度でも追加可能）。</li>
     <li>「ChatGPT 記憶のプロンプトを作成する」ボタンを押すと、以下の形式でクリップボードにコピーされます。</li>
   </ol>
@@ -69,6 +84,7 @@
   <p><strong>※ファイルを1つも追加していない状態では、コピーは行われず、警告が表示されます。</strong></p>
   <p><strong>※同じファイル名のファイルは2回目以降無視されます。</strong></p>
   <p><strong>※バイナリファイルや文字化けのあるファイルは自動で除外されます。</strong></p>
+  <p><strong>※mp3, png, pdfなどの非テキスト系ファイルは拡張子で除外されます。</strong></p>
 </div>
 
 <script>
@@ -77,7 +93,7 @@
   const fileList = document.getElementById('fileList');
   const preview = document.getElementById('preview');
 
-  const allowedExtensions = ['txt', 'md', 'json', 'csv', 'html', 'xml', 'js', 'ts'];
+  const deniedExtensions = ['mp3', 'mp4', 'wav', 'ogg', 'jpg', 'jpeg', 'png', 'gif', 'pdf', 'zip', 'rar', '7z', 'exe', 'dll', 'bin', 'mov', 'avi'];
 
   dropZone.addEventListener('dragover', e => {
     e.preventDefault();
@@ -95,8 +111,8 @@
 
     [...files].forEach(file => {
       const ext = file.name.split('.').pop().toLowerCase();
-      if (!allowedExtensions.includes(ext)) {
-        console.warn(`${file.name} は許可されていないファイル形式です`);
+      if (deniedExtensions.includes(ext)) {
+        alert(`${file.name} は非対応のファイル形式（.${ext}）のため読み込まれませんでした。`);
         return;
       }
 
@@ -107,8 +123,6 @@
       const reader = new FileReader();
       reader.onload = () => {
         const content = reader.result;
-
-        // 文字化けの可能性をチェック（ の出現数）
         const garbledCount = (content.match(/\uFFFD/g) || []).length;
         if (garbledCount > 5) {
           alert(`${file.name} は文字化けのため読み込まれませんでした。`);
@@ -118,6 +132,20 @@
         fileContents.push({ name: file.name, content });
         const li = document.createElement('li');
         li.textContent = file.name;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = '－';
+        removeBtn.className = 'remove-btn';
+        removeBtn.onclick = () => {
+          const index = fileContents.findIndex(f => f.name === file.name);
+          if (index !== -1) {
+            fileContents.splice(index, 1);
+            fileList.removeChild(li);
+            updatePreview();
+          }
+        };
+
+        li.appendChild(removeBtn);
         fileList.appendChild(li);
       };
       reader.readAsText(file, 'utf-8');
@@ -130,11 +158,7 @@
       return;
     }
 
-    let prompt = "下記の内容を最新の内容として記憶して下さい。\n\n";
-    fileContents.forEach(file => {
-      prompt += `[${file.name}]\n${file.content}\n\n`;
-    });
-
+    const prompt = buildPrompt();
     preview.textContent = prompt;
 
     navigator.clipboard.writeText(prompt).then(() => {
@@ -142,6 +166,22 @@
     }).catch(err => {
       alert("コピーに失敗しました: " + err);
     });
+  }
+
+  function buildPrompt() {
+    let prompt = "下記の内容を最新の内容として記憶して下さい。\n\n";
+    fileContents.forEach(file => {
+      prompt += `[${file.name}]\n${file.content}\n\n`;
+    });
+    return prompt;
+  }
+
+  function updatePreview() {
+    if (fileContents.length === 0) {
+      preview.textContent = '(まだ生成されていません)';
+    } else {
+      preview.textContent = buildPrompt();
+    }
   }
 </script>
 
