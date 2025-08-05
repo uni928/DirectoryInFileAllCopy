@@ -95,6 +95,20 @@
 
   const deniedExtensions = ['mp3', 'mp4', 'wav', 'ogg', 'jpg', 'jpeg', 'png', 'gif', 'pdf', 'zip', 'rar', '7z', 'exe', 'dll', 'bin', 'mov', 'avi'];
 
+  function isProbablyGarbled(text) {
+    const totalLength = text.length;
+    if (totalLength === 0) return false;
+    const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F\x7F]/g) || []).length;
+    const replacementChars = (text.match(/\uFFFD/g) || []).length;
+    const nullChars = (text.match(/\x00/g) || []).length;
+
+    return (
+      nonPrintable / totalLength > 0.1 ||
+      replacementChars / totalLength > 0.05 ||
+      nullChars > 0
+    );
+  }
+
   dropZone.addEventListener('dragover', e => {
     e.preventDefault();
     dropZone.style.borderColor = '#00f';
@@ -123,8 +137,8 @@
       const reader = new FileReader();
       reader.onload = () => {
         const content = reader.result;
-        const garbledCount = (content.match(/\uFFFD/g) || []).length;
-        if (garbledCount > 5) {
+
+        if (isProbablyGarbled(content)) {
           alert(`${file.name} は文字化けのため読み込まれませんでした。`);
           return;
         }
